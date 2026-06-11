@@ -28,11 +28,23 @@
 <div id="result"></div>
 
 <script>
+let scannerName =
+localStorage.getItem("scanner");
 
+if(!scannerName){
+
+    scannerName =
+    prompt("Enter Scanner Name");
+
+    localStorage.setItem(
+        "scanner",
+        scannerName
+    );
+}
 const APPS_SCRIPT_URL =
 "https://script.google.com/macros/s/AKfycbyWWMrtRacvUrQ_vHQaxtxI6BoJkT4HTfFtClIBb1pELtPpUyPzYwNmNOEvXVO1DdzlDw/exec";
 
-const SCANNER_NAME = "Scanner1";
+const SCANNER_NAME = scannerName;
 
 let lastScan = "";
 
