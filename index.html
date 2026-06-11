@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Attendance Scanner</title>
+
+    <script src="https://unpkg.com/html5-qrcode"></script>
+
+    <style>
+        body{
+            font-family: Arial;
+            text-align:center;
+            padding:20px;
+        }
+
+        #result{
+            font-size:24px;
+            margin-top:20px;
+        }
+    </style>
+</head>
+
+<body>
+
+<h2>Attendance Scanner</h2>
+
+<div id="reader"></div>
+
+<div id="result"></div>
+
+<script>
+
+const APPS_SCRIPT_URL =
+"https://script.google.com/macros/s/AKfycbyWWMrtRacvUrQ_vHQaxtxI6BoJkT4HTfFtClIBb1pELtPpUyPzYwNmNOEvXVO1DdzlDw/exec";
+
+const SCANNER_NAME = "Scanner1";
+
+let lastScan = "";
+
+function onScanSuccess(decodedText){
+
+    if(decodedText === lastScan){
+        return;
+    }
+
+    lastScan = decodedText;
+
+    document.getElementById("result").innerHTML =
+        "Sending " + decodedText;
+
+    fetch(APPS_SCRIPT_URL,{
+        method:"POST",
+        body:JSON.stringify({
+            sn:decodedText,
+            scanner:SCANNER_NAME
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+
+        document.getElementById("result").innerHTML =
+            "✓ Recorded<br>" + decodedText;
+
+        setTimeout(()=>{
+            document.getElementById("result").innerHTML="";
+        },1000);
+
+    })
+    .catch(error=>{
+
+        document.getElementById("result").innerHTML =
+            "Error";
+
+    });
+}
+
+const html5QrCodeScanner =
+new Html5QrcodeScanner(
+    "reader",
+    {
+        fps:10,
+        qrbox:250
+    }
+);
+
+html5QrCodeScanner.render(
+    onScanSuccess
+);
+
+</script>
+
+</body>
+</html>
