@@ -85,18 +85,36 @@ function onScanSuccess(decodedText){
     });
 }
 
-const html5QrCodeScanner =
-new Html5QrcodeScanner(
-    "reader",
-    {
-        fps:10,
-        qrbox:250
-    }
-);
+const html5QrCode = new Html5Qrcode("reader");
 
-html5QrCodeScanner.render(
-    onScanSuccess
-);
+Html5Qrcode.getCameras().then(devices => {
+
+    if (devices && devices.length) {
+
+        let rearCamera = devices.find(
+            device =>
+                device.label.toLowerCase().includes("back") ||
+                device.label.toLowerCase().includes("rear")
+        );
+
+        const cameraId =
+            rearCamera ?
+            rearCamera.id :
+            devices[devices.length - 1].id;
+
+        html5QrCode.start(
+            cameraId,
+            {
+                fps: 10,
+                qrbox: 250
+            },
+            onScanSuccess
+        );
+    }
+
+}).catch(err => {
+    console.log(err);
+});
 
 </script>
 
