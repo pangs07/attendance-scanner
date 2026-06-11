@@ -1,21 +1,51 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
     <title>Attendance Scanner</title>
 
     <script src="https://unpkg.com/html5-qrcode"></script>
 
     <style>
+
         body{
-            font-family: Arial;
+            font-family: Arial, sans-serif;
             text-align:center;
             padding:20px;
+            margin:0;
+        }
+
+        h2{
+            margin-bottom:10px;
+        }
+
+        #reader{
+            width:100%;
+            max-width:500px;
+            margin:auto;
         }
 
         #result{
-            font-size:24px;
             margin-top:20px;
+            font-size:22px;
+            font-weight:bold;
+            min-height:40px;
         }
+
+        .success{
+            color:green;
+        }
+
+        .error{
+            color:red;
+        }
+
+        .info{
+            color:blue;
+        }
+
     </style>
 </head>
 
@@ -28,92 +58,149 @@
 <div id="result"></div>
 
 <script>
-let scannerName =
-localStorage.getItem("scanner");
+
+const APPS_SCRIPT_URL =
+"https://script.google.com/macros/s/AKfycbyWWMrtRacvUrQ_vHQaxtxI6BoJkT4HTfFtClIBb1pELtPpUyPzYwNmNOEvXVO1DdzlDw/exec";
+
+/* Scanner Identification */
+
+let scannerName = localStorage.getItem("scanner");
 
 if(!scannerName){
 
-    scannerName =
-    prompt("Enter Scanner Name");
+    scannerName = prompt(
+        "Enter Scanner Name (Example: Scanner1)"
+    );
+
+    if(!scannerName){
+        scannerName = "Unknown";
+    }
 
     localStorage.setItem(
         "scanner",
         scannerName
     );
 }
-const APPS_SCRIPT_URL =
-"https://script.google.com/macros/s/AKfycbyWWMrtRacvUrQ_vHQaxtxI6BoJkT4HTfFtClIBb1pELtPpUyPzYwNmNOEvXVO1DdzlDw/exec";
 
-const SCANNER_NAME = scannerName;
+/* QR Processing */
 
 let lastScan = "";
+let processing = false;
 
 function onScanSuccess(decodedText){
+
+    if(processing){
+        return;
+    }
 
     if(decodedText === lastScan){
         return;
     }
 
+    processing = true;
     lastScan = decodedText;
 
+    document.getElementById("result").className = "info";
+
     document.getElementById("result").innerHTML =
-        "Sending " + decodedText;
+        "Sending Attendance...<br>" +
+        decodedText;
 
     fetch(APPS_SCRIPT_URL,{
+
         method:"POST",
+
         body:JSON.stringify({
+
             sn:decodedText,
-            scanner:SCANNER_NAME
+            scanner:scannerName
+
         })
+
     })
+
     .then(response => response.json())
+
     .then(data => {
 
-        document.getElementById("result").innerHTML =
-            "✓ Recorded<br>" + decodedText;
+        document.getElementById("result").className =
+            "success";
 
-        setTimeout(()=>{
-            document.getElementById("result").innerHTML="";
-        },1000);
+        document.getElementById("result").innerHTML =
+            "✓ RECORDED<br>" +
+            decodedText;
+
+        setTimeout(() => {
+
+            processing = false;
+            lastScan = "";
+
+            document.getElementById("result").innerHTML =
+                "";
+
+        },2000);
 
     })
-    .catch(error=>{
+
+    .catch(error => {
+
+        console.error(error);
+
+        document.getElementById("result").className =
+            "error";
 
         document.getElementById("result").innerHTML =
-            "Error";
+            "✗ ERROR SENDING ATTENDANCE";
+
+        setTimeout(() => {
+
+            processing = false;
+            lastScan = "";
+
+            document.getElementById("result").innerHTML =
+                "";
+
+        },2000);
 
     });
 }
 
-const html5QrCode = new Html5Qrcode("reader");
+/* Camera Initialization */
 
-Html5Qrcode.getCameras().then(devices => {
+const html5QrCode =
+    new Html5Qrcode("reader");
 
-    if (devices && devices.length) {
+html5QrCode.start(
 
-        let rearCamera = devices.find(
-            device =>
-                device.label.toLowerCase().includes("back") ||
-                device.label.toLowerCase().includes("rear")
-        );
+    {
+        facingMode: "environment"
+    },
 
-        const cameraId =
-            rearCamera ?
-            rearCamera.id :
-            devices[devices.length - 1].id;
+    {
+        fps: 10,
 
-        html5QrCode.start(
-            cameraId,
-            {
-                fps: 10,
-                qrbox: 250
-            },
-            onScanSuccess
-        );
-    }
+        qrbox: {
+            width: 250,
+            height: 250
+        },
 
-}).catch(err => {
-    console.log(err);
+        aspectRatio: 1.0
+    },
+
+    onScanSuccess
+
+)
+
+.catch(err => {
+
+    console.error(err);
+
+    document.getElementById("result").className =
+        "error";
+
+    document.getElementById("result").innerHTML =
+        "Unable to access camera";
+
 });
 
 </script>
