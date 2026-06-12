@@ -1,52 +1,58 @@
 <!DOCTYPE html>
 <html>
+
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <title>Attendance Scanner</title>
+<meta charset="utf-8">
 
-    <script src="https://unpkg.com/html5-qrcode"></script>
+<meta name="viewport"
+content="width=device-width, initial-scale=1">
 
-    <style>
+<title>Attendance Scanner</title>
 
-        body{
-            font-family: Arial, sans-serif;
-            text-align:center;
-            padding:20px;
-            margin:0;
-        }
+<script src="https://unpkg.com/html5-qrcode"></script>
 
-        h2{
-            margin-bottom:10px;
-        }
+<style>
 
-        #reader{
-            width:100%;
-            max-width:500px;
-            margin:auto;
-        }
+body{
+    font-family:Arial,sans-serif;
+    text-align:center;
+    padding:20px;
+}
 
-        #result{
-            margin-top:20px;
-            font-size:30px;
-            font-weight:bold;
-            min-height:40px;
-        }
+#reader{
+    width:100%;
+    max-width:500px;
+    margin:auto;
+}
 
-        .success{
-            color:green;
-        }
+#result{
+    margin-top:20px;
+    font-size:48px;
+    font-weight:bold;
+    min-height:100px;
+}
 
-        .error{
-            color:red;
-        }
+.success{
+    color:green;
+}
 
-        .info{
-            color:blue;
-        }
+.error{
+    color:red;
+}
 
-    </style>
+.info{
+    color:blue;
+}
+
+button{
+    margin-top:20px;
+    padding:10px 20px;
+    font-size:18px;
+}
+
+</style>
+
 </head>
 
 <body>
@@ -57,37 +63,69 @@
 
 <div id="result"></div>
 
+<button onclick="resetScanner()">
+Change Scanner
+</button>
+
 <script>
 
 const APPS_SCRIPT_URL =
-"https://script.google.com/macros/s/AKfycbyWWMrtRacvUrQ_vHQaxtxI6BoJkT4HTfFtClIBb1pELtPpUyPzYwNmNOEvXVO1DdzlDw/exec";
+"https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec";
 
-/* Scanner Identification */
-
-let scannerName = localStorage.getItem("scanner");
+let scannerName =
+localStorage.getItem("scannerName");
 
 if(!scannerName){
 
-    scannerName = prompt(
-        "Enter Scanner Name (Example: Scanner1)"
+    scannerName =
+    prompt(
+      "Enter Scanner Name (Scanner1)"
     );
 
-    if(!scannerName){
-        scannerName = "Unknown";
-    }
-
     localStorage.setItem(
-        "scanner",
-        scannerName
+      "scannerName",
+      scannerName
     );
 }
 
-/* QR Processing */
+let scannerToken =
+localStorage.getItem(
+    "scannerToken"
+);
 
-let lastScan = "";
+let activated =
+scannerToken ? true : false;
+
 let processing = false;
 
-function onScanSuccess(decodedText){
+let lastScan = "";
+
+function showMessage(
+    text,
+    css
+){
+
+    document
+      .getElementById("result")
+      .className = css;
+
+    document
+      .getElementById("result")
+      .innerHTML = text;
+}
+
+function resetScanner(){
+
+    localStorage.removeItem(
+      "scannerToken"
+    );
+
+    location.reload();
+}
+
+function onScanSuccess(
+    decodedText
+){
 
     if(processing){
         return;
@@ -97,46 +135,116 @@ function onScanSuccess(decodedText){
         return;
     }
 
-    processing = true;
     lastScan = decodedText;
 
-    document.getElementById("result").className = "info";
+    /*
+     FIRST SCAN:
+     OPERATOR QR
+    */
 
-    document.getElementById("result").innerHTML =
-        "Sending Attendance...<br>" +
-        decodedText;
+    if(!activated){
 
-    fetch(APPS_SCRIPT_URL,{
+        scannerToken =
+            decodedText;
+
+        localStorage.setItem(
+            "scannerToken",
+            scannerToken
+        );
+
+        activated = true;
+
+        showMessage(
+          "✓ Scanner Activated",
+          "success"
+        );
+
+        setTimeout(() => {
+
+            document
+              .getElementById(
+                "result"
+              )
+              .innerHTML = "";
+
+        },1000);
+
+        return;
+    }
+
+    /*
+      ATTENDANCE SCAN
+    */
+
+    processing = true;
+
+    showMessage(
+      "Sending...",
+      "info"
+    );
+
+    fetch(
+      APPS_SCRIPT_URL,
+      {
 
         method:"POST",
 
         body:JSON.stringify({
 
             sn:decodedText,
-            scanner:scannerName
+
+            scanner:
+            scannerName,
+
+            token:
+            scannerToken
 
         })
 
-    })
+      }
+    )
 
-    .then(response => response.json())
+    .then(
+      response =>
+      response.json()
+    )
 
     .then(data => {
 
-        document.getElementById("result").className =
-            "success";
+        if(
+          data.status ===
+          "unauthorized"
+        ){
 
-        document.getElementById("result").innerHTML =
-            "✓ RECORDED<br>" +
-            decodedText;
+            showMessage(
+              "Invalid Scanner",
+              "error"
+            );
+
+            processing =
+            false;
+
+            return;
+        }
+
+        showMessage(
+          "✓ RECORDED<br>" +
+          decodedText,
+          "success"
+        );
 
         setTimeout(() => {
 
-            processing = false;
+            processing =
+            false;
+
             lastScan = "";
 
-            document.getElementById("result").innerHTML =
-                "";
+            document
+              .getElementById(
+                "result"
+              )
+              .innerHTML = "";
 
         },500);
 
@@ -144,66 +252,70 @@ function onScanSuccess(decodedText){
 
     .catch(error => {
 
-        console.error(error);
+        console.error(
+          error
+        );
 
-        document.getElementById("result").className =
-            "error";
-
-        document.getElementById("result").innerHTML =
-            "✗ ERROR SENDING ATTENDANCE";
+        showMessage(
+          "ERROR",
+          "error"
+        );
 
         setTimeout(() => {
 
-            processing = false;
+            processing =
+            false;
+
             lastScan = "";
 
-            document.getElementById("result").innerHTML =
-                "";
+            document
+              .getElementById(
+                "result"
+              )
+              .innerHTML = "";
 
-        },500);
+        },1000);
 
     });
+
 }
 
-/* Camera Initialization */
-
 const html5QrCode =
-    new Html5Qrcode("reader");
+new Html5Qrcode(
+    "reader"
+);
 
 html5QrCode.start(
 
     {
-        facingMode: "environment"
+      facingMode:
+      "environment"
     },
 
     {
-        fps: 10,
+      fps:10,
 
-        qrbox: {
-            width: 250,
-            height: 250
-        },
-
-        aspectRatio: 1.0
+      qrbox:{
+          width:250,
+          height:250
+      }
     },
 
     onScanSuccess
 
-)
-
-.catch(err => {
+).catch(err => {
 
     console.error(err);
 
-    document.getElementById("result").className =
-        "error";
-
-    document.getElementById("result").innerHTML =
-        "Unable to access camera";
+    showMessage(
+      "Camera Error",
+      "error"
+    );
 
 });
 
 </script>
 
 </body>
+
 </html>
