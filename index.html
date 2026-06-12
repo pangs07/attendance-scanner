@@ -4,9 +4,7 @@
 <head>
 
 <meta charset="utf-8">
-
-<meta name="viewport"
-content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
 <title>Attendance Scanner</title>
 
@@ -15,40 +13,44 @@ content="width=device-width, initial-scale=1">
 <style>
 
 body{
-    font-family:Arial,sans-serif;
-    text-align:center;
-    padding:20px;
+    font-family: Arial, sans-serif;
+    text-align: center;
+    padding: 20px;
+}
+
+h2{
+    font-size: 36px;
 }
 
 #reader{
-    width:100%;
-    max-width:500px;
-    margin:auto;
+    width: 100%;
+    max-width: 500px;
+    margin: auto;
 }
 
 #result{
-    margin-top:20px;
-    font-size:48px;
-    font-weight:bold;
-    min-height:100px;
+    margin-top: 20px;
+    font-size: 48px;
+    font-weight: bold;
+    min-height: 100px;
 }
 
 .success{
-    color:green;
+    color: green;
 }
 
 .error{
-    color:red;
+    color: red;
 }
 
 .info{
-    color:blue;
+    color: blue;
 }
 
 button{
-    margin-top:20px;
-    padding:10px 20px;
-    font-size:18px;
+    margin-top: 20px;
+    padding: 10px 20px;
+    font-size: 18px;
 }
 
 </style>
@@ -69,24 +71,54 @@ Change Scanner
 
 <script>
 
+/* ===================================
+   CONFIGURATION
+=================================== */
+
 const APPS_SCRIPT_URL =
 "https://script.google.com/macros/s/AKfycbyWWMrtRacvUrQ_vHQaxtxI6BoJkT4HTfFtClIBb1pELtPpUyPzYwNmNOEvXVO1DdzlDw/exec";
 
+/* ===================================
+   SUCCESS BEEP
+=================================== */
+
+const successBeep =
+new Audio(
+"https://actions.google.com/sounds/v1/cartoon/pop.ogg"
+);
+
+/* ===================================
+   SCANNER NAME
+=================================== */
+
 let scannerName =
-localStorage.getItem("scannerName");
+localStorage.getItem(
+    "scannerName"
+);
 
 if(!scannerName){
 
     scannerName =
     prompt(
-      "Enter Scanner Name (Scanner1)"
+      "Enter Scanner Name (e.g. Scanner1)"
     );
+
+    if(!scannerName){
+
+        scannerName =
+        "Unknown";
+
+    }
 
     localStorage.setItem(
       "scannerName",
       scannerName
     );
 }
+
+/* ===================================
+   SCANNER TOKEN
+=================================== */
 
 let scannerToken =
 localStorage.getItem(
@@ -96,22 +128,29 @@ localStorage.getItem(
 let activated =
 scannerToken ? true : false;
 
-let processing = false;
+/* ===================================
+   STATE VARIABLES
+=================================== */
 
+let processing = false;
 let lastScan = "";
+
+/* ===================================
+   HELPER FUNCTIONS
+=================================== */
 
 function showMessage(
     text,
     css
 ){
 
-    document
-      .getElementById("result")
-      .className = css;
+    const result =
+    document.getElementById(
+        "result"
+    );
 
-    document
-      .getElementById("result")
-      .innerHTML = text;
+    result.className = css;
+    result.innerHTML = text;
 }
 
 function resetScanner(){
@@ -120,8 +159,16 @@ function resetScanner(){
       "scannerToken"
     );
 
+    localStorage.removeItem(
+      "scannerName"
+    );
+
     location.reload();
 }
+
+/* ===================================
+   QR SUCCESS HANDLER
+=================================== */
 
 function onScanSuccess(
     decodedText
@@ -138,18 +185,18 @@ function onScanSuccess(
     lastScan = decodedText;
 
     /*
-     FIRST SCAN:
-     OPERATOR QR
+      FIRST SCAN:
+      OPERATOR QR
     */
 
     if(!activated){
 
         scannerToken =
-            decodedText;
+        decodedText;
 
         localStorage.setItem(
-            "scannerToken",
-            scannerToken
+          "scannerToken",
+          scannerToken
         );
 
         activated = true;
@@ -167,7 +214,40 @@ function onScanSuccess(
               )
               .innerHTML = "";
 
-        },1000);
+            lastScan = "";
+
+        },2500);
+
+        return;
+    }
+
+    /*
+      PREVENT OPERATOR QR
+      FROM BEING LOGGED
+    */
+
+    if(
+        String(decodedText)
+          .toUpperCase()
+          .startsWith("SCN")
+    ){
+
+        showMessage(
+          "Operator QR Detected",
+          "error"
+        );
+
+        setTimeout(() => {
+
+            document
+              .getElementById(
+                "result"
+              )
+              .innerHTML = "";
+
+            lastScan = "";
+
+        },2000);
 
         return;
     }
@@ -179,9 +259,10 @@ function onScanSuccess(
     processing = true;
 
     showMessage(
-      "Sending...",
-      "info"
-    );
+  "⏳ SENDING<br>" +
+  decodedText,
+  "info"
+);
 
     fetch(
       APPS_SCRIPT_URL,
@@ -221,40 +302,89 @@ function onScanSuccess(
               "error"
             );
 
-            processing =
-            false;
+            processing = false;
+            lastScan = "";
 
             return;
         }
 
-        showMessage(
-          "✓ RECORDED<br>" +
-          decodedText,
-          "success"
-        );
+        if(
+          data.status ===
+          "invalid_attendance"
+        ){
 
-        setTimeout(() => {
+            showMessage(
+              "Operator QR Cannot Be Logged",
+              "error"
+            );
 
-            processing =
-            false;
-
+            processing = false;
             lastScan = "";
 
-            document
-              .getElementById(
-                "result"
-              )
-              .innerHTML = "";
+            return;
+        }
 
-        },500);
+        if(
+          data.status ===
+          "invalid_request"
+        ){
+
+            showMessage(
+              "Invalid Request",
+              "error"
+            );
+
+            processing = false;
+            lastScan = "";
+
+            return;
+        }
+
+        if(
+          data.status ===
+          "server_error"
+        ){
+
+            showMessage(
+              "Server Error",
+              "error"
+            );
+
+            processing = false;
+            lastScan = "";
+
+            return;
+        }
+
+        if(
+  data.status ===
+  "success"
+){
+
+    successBeep.play();
+
+    showMessage(
+      "✓ RECORDED<br>" +
+      decodedText,
+      "success"
+    );
+
+    /*
+      Immediately ready for next scan.
+      Keep last successful scan visible
+      until another scan occurs.
+    */
+
+    processing = false;
+    lastScan = "";
+
+}
 
     })
 
     .catch(error => {
 
-        console.error(
-          error
-        );
+        console.error(error);
 
         showMessage(
           "ERROR",
@@ -263,9 +393,7 @@ function onScanSuccess(
 
         setTimeout(() => {
 
-            processing =
-            false;
-
+            processing = false;
             lastScan = "";
 
             document
@@ -274,11 +402,15 @@ function onScanSuccess(
               )
               .innerHTML = "";
 
-        },1000);
+        },3000);
 
     });
 
 }
+
+/* ===================================
+   CAMERA START
+=================================== */
 
 const html5QrCode =
 new Html5Qrcode(
@@ -293,17 +425,19 @@ html5QrCode.start(
     },
 
     {
-      fps:10,
+      fps: 10,
 
-      qrbox:{
-          width:250,
-          height:250
+      qrbox: {
+          width: 250,
+          height: 250
       }
     },
 
     onScanSuccess
 
-).catch(err => {
+)
+
+.catch(err => {
 
     console.error(err);
 
